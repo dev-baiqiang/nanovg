@@ -29,7 +29,6 @@
 #define NANOVG_GL3_IMPLEMENTATION
 #include "nanovg_gl.h"
 #include "demo.h"
-#include "perf.h"
 
 
 void errorcb(int error, const char* desc)
@@ -60,18 +59,12 @@ int main()
 	GLFWwindow* window;
 	DemoData data;
 	NVGcontext* vg = NULL;
-	GPUtimer gpuTimer;
-	PerfGraph fps, cpuGraph, gpuGraph;
-	double prevt = 0, cpuTime = 0;
 
 	if (!glfwInit()) {
 		printf("Failed to init GLFW.");
 		return -1;
 	}
 
-	initGraph(&fps, GRAPH_RENDER_FPS, "Frame Time");
-	initGraph(&cpuGraph, GRAPH_RENDER_MS, "CPU Time");
-	initGraph(&gpuGraph, GRAPH_RENDER_MS, "GPU Time");
 
 	glfwSetErrorCallback(errorcb);
 #ifndef _WIN32 // don't require this on win32, and works with more cards
@@ -119,26 +112,16 @@ int main()
 		return -1;
 
 	glfwSwapInterval(0);
-
-	initGPUTimer(&gpuTimer);
-
 	glfwSetTime(0);
-	prevt = glfwGetTime();
 
 	while (!glfwWindowShouldClose(window))
 	{
-		double mx, my, t, dt;
+		double mx, my, t;
 		int winWidth, winHeight;
 		int fbWidth, fbHeight;
 		float pxRatio;
-		float gpuTimes[3];
-		int i, n;
 
 		t = glfwGetTime();
-		dt = t - prevt;
-		prevt = t;
-
-		startGPUTimer(&gpuTimer);
 
 		glfwGetCursorPos(window, &mx, &my);
 		glfwGetWindowSize(window, &winWidth, &winHeight);
@@ -158,23 +141,7 @@ int main()
 
 		renderDemo(vg, mx,my, winWidth,winHeight, t, blowup, &data);
 
-		renderGraph(vg, 5,5, &fps);
-		renderGraph(vg, 5+200+5,5, &cpuGraph);
-		if (gpuTimer.supported)
-			renderGraph(vg, 5+200+5+200+5,5, &gpuGraph);
-
 		nvgEndFrame(vg);
-
-		// Measure the CPU time taken excluding swap buffers (as the swap may wait for GPU)
-		cpuTime = glfwGetTime() - t;
-
-		updateGraph(&fps, dt);
-		updateGraph(&cpuGraph, cpuTime);
-
-		// We may get multiple results.
-		n = stopGPUTimer(&gpuTimer, gpuTimes, 3);
-		for (i = 0; i < n; i++)
-			updateGraph(&gpuGraph, gpuTimes[i]);
 
 		if (screenshot) {
 			screenshot = 0;
@@ -188,10 +155,6 @@ int main()
 	freeDemoData(vg, &data);
 
 	nvgDeleteGL3(vg);
-
-	printf("Average Frame Time: %.2f ms\n", getGraphAverage(&fps) * 1000.0f);
-	printf("          CPU Time: %.2f ms\n", getGraphAverage(&cpuGraph) * 1000.0f);
-	printf("          GPU Time: %.2f ms\n", getGraphAverage(&gpuGraph) * 1000.0f);
 
 	glfwTerminate();
 	return 0;
